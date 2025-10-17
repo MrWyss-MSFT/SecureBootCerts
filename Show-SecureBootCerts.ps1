@@ -67,7 +67,7 @@ $CertPK = Get-UEFISecureBootCerts -Variable pk
 $CertKEK = Get-UEFISecureBootCerts -Variable kek
 $CertDB = Get-UEFISecureBootCerts -Variable db
 $CertDBX = Get-UEFISecureBootCerts -Variable dbx
-$MWPPCA2011inDBX = ($CertDBX | Where-Object SignatureSubject -eq "Microsoft Windows Production PCA 2011").Count -gt 0
+$MWPPCA2011inDBX = ($CertDBX | Where-Object SignatureSubject -like "Microsoft Windows Production PCA 2011*").Count -gt 0
 
 
 # Read HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Secureboot /v AvailableUpdates
