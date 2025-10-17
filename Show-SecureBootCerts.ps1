@@ -1,8 +1,8 @@
 #Requires -Version 7.0
 #Requires -RunAsAdministrator
-#Requires -Modules @{ ModuleName="UEFIv2"; RequiredVersion="2.8" }
+#Requires -Modules UEFIv2
 
-Import-Module -Name UEFIv2 -MinimumVersion 2.8
+Import-Module -Name UEFIv2
 
 #region Functions
 Function Parse-SvnData {
@@ -67,6 +67,7 @@ $CertPK = Get-UEFISecureBootCerts -Variable pk
 $CertKEK = Get-UEFISecureBootCerts -Variable kek
 $CertDB = Get-UEFISecureBootCerts -Variable db
 $CertDBX = Get-UEFISecureBootCerts -Variable dbx
+$MWPPCA2011inDBX = ($CertDBX | Where-Object SignatureSubject -eq "Microsoft Windows Production PCA 2011").Count -gt 0
 
 
 # Read HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Secureboot /v AvailableUpdates
@@ -121,6 +122,7 @@ $Output = [PSCustomObject]@{
     PK                    = $CertPK
     KEK                   = $CertKEK
     DB                    = $CertDB
+    MWPPCA2011inDBX       = $MWPPCA2011inDBX
     SVNs                  = $SVNs
     AvailableUpdates      = $AvailableUpdates
     AvailableUpdatesFlags = [AvailableUpdatesFlags]$AvailableUpdates
@@ -130,6 +132,7 @@ $Output | Select-Object `
     @{n = 'PK'; e = { $_.PK.SignatureSubject } }, `
     @{n = 'KEK'; e = { $_.KEK.SignatureSubject } }, `
     @{n = 'DB'; e = { $_.DB.SignatureSubject } }, `
+    MWPPCA2011inDBX, `
     @{n = 'SVNs'; e = {
             if ($_.SVNs) {
                 ($_.SVNs | ForEach-Object { "v$($_.Version) [$($_.ApplicationGUID)]" }) -join ', '
