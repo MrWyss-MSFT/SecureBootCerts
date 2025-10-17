@@ -67,7 +67,7 @@ $CertPK = Get-UEFISecureBootCerts -Variable pk
 $CertKEK = Get-UEFISecureBootCerts -Variable kek
 $CertDB = Get-UEFISecureBootCerts -Variable db
 $CertDBX = Get-UEFISecureBootCerts -Variable dbx
-$MWPPCA2011inDBX = ($CertDBX | Where-Object SignatureSubject -like "*Microsoft Windows Production PCA 2011*").Count -gt 0
+$PCA2011inDBX = ($CertDBX | Where-Object SignatureSubject -like "*Microsoft Windows Production PCA 2011*").Count -gt 0
 
 
 # Read HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Secureboot /v AvailableUpdates
@@ -112,27 +112,27 @@ $LastEvents = Get-WinEvent -FilterHashtable @{
 
 # Parse the SVN entries from dbx excluding the bootmgr entry
 $SVNs = $CertDBX |
-Where-Object SignatureOwner -eq "9d132b6c-59d5-4388-ab1c-185cfcb2eb92" |
-Select-Object -ExpandProperty Signature |
-ForEach-Object {
-    Parse-SvnData -Data ([System.Convert]::FromHexString($_))
-}
+    Where-Object SignatureOwner -eq "9d132b6c-59d5-4388-ab1c-185cfcb2eb92" |
+    Select-Object -ExpandProperty Signature |
+    ForEach-Object {
+        Parse-SvnData -Data ([System.Convert]::FromHexString($_))
+    }
 
 $Output = [PSCustomObject]@{
-    PK                    = $CertPK
-    KEK                   = $CertKEK
-    DB                    = $CertDB
-    MWPPCA2011inDBX       = $MWPPCA2011inDBX
-    SVNs                  = $SVNs
-    AvailableUpdates      = $AvailableUpdates
+    PK = $CertPK
+    KEK = $CertKEK
+    DB = $CertDB
+    PCA2011inDBX = $PCA2011inDBX
+    SVNs = $SVNs
+    AvailableUpdates = $AvailableUpdates
     AvailableUpdatesFlags = [AvailableUpdatesFlags]$AvailableUpdates
-    LastEvents            = $LastEvents
+    LastEvents = $LastEvents
 }
 $Output | Select-Object `
     @{n = 'PK'; e = { $_.PK.SignatureSubject } }, `
     @{n = 'KEK'; e = { $_.KEK.SignatureSubject } }, `
     @{n = 'DB'; e = { $_.DB.SignatureSubject } }, `
-    MWPPCA2011inDBX, `
+    PCA2011inDBX, `
     @{n = 'SVNs'; e = {
             if ($_.SVNs) {
                 ($_.SVNs | ForEach-Object { "v$($_.Version) [$($_.ApplicationGUID)]" }) -join ', '
