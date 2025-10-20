@@ -70,8 +70,26 @@ $CertDBX = Get-UEFISecureBootCerts -Variable dbx
 $PCA2011inDBX = ($CertDBX | Where-Object SignatureSubject -like "*Microsoft Windows Production PCA 2011*").Count -gt 0
 
 
-# Read HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Secureboot /v AvailableUpdates
-$AvailableUpdates = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot" -Name "AvailableUpdates" -ErrorAction SilentlyContinue).AvailableUpdates
+# Read https://support.microsoft.com/en-us/topic/registry-key-updates-for-secure-boot-windows-devices-with-it-managed-updates-a7be69c9-4634-42e1-9ca1-df06f43f360d#bkmk_registry_keys
+$SecureBootServicing = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing" -ErrorAction SilentlyContinue)
+$SecureBoot = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot" -ErrorAction SilentlyContinue)
+$SecureBootServicingDeviceAttributes = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing\DeviceAttributes" -ErrorAction SilentlyContinue)
+
+# Available Updates
+$AvailableUpdates = $SecureBoot.AvailableUpdates
+
+# Servicing Info
+$UEFICA2023Status = $SecureBootServicing.UEFICA2023Status
+$UEFICA2023ErrorCode = $SecureBootServicing.UEFICA2023ErrorCode
+$HighConfidenceOptOut = $SecureBootServicing.HighConfidenceOptOut
+$MicrosoftUpdateManagedOptIn = $SecureBootServicing.MicrosoftUpdateManagedOptIn
+
+# Firmware Info
+$FirmwareManufacturer = $SecureBootServicingDeviceAttributes.FirmwareManufacturer
+$FirmwareVersion = $SecureBootServicingDeviceAttributes.FirmwareVersion
+$FirmwareReleaseDate = $SecureBootServicingDeviceAttributes.FirmwareReleaseDate
+
+
 <#
 0000000000000001 0x0001 → N/A
 0000000000000010 0x0002 → N/A
@@ -91,6 +109,11 @@ $AvailableUpdates = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Cont
 1000000000000000 0x8000 → N/A
 #>
 # Enum
+
+
+
+
+
 [Flags()] enum AvailableUpdatesFlags {
     None = 0x0000
     Apply_Microsoft_Corporation_KEK_2K_CA_2023 = 0x0004
@@ -124,9 +147,16 @@ $Output = [PSCustomObject]@{
     DB = $CertDB
     PCA2011inDBX = $PCA2011inDBX
     SVNs = $SVNs
+    UEFICA2023Status = $UEFICA2023Status
+    UEFICA2023ErrorCode = $UEFICA2023ErrorCode
+    HighConfidenceOptOut = $HighConfidenceOptOut
+    MicrosoftUpdateManagedOptIn = $MicrosoftUpdateManagedOptIn
     AvailableUpdates = $AvailableUpdates
     AvailableUpdatesFlags = [AvailableUpdatesFlags]$AvailableUpdates
     LastEvents = $LastEvents
+    FirmwareManufacturer = $FirmwareManufacturer
+    FirmwareReleaseDate = $FirmwareReleaseDate
+    FirmwareVersion = $FirmwareVersion
 }
 $Output | Select-Object `
     @{n = 'PK'; e = { $_.PK.SignatureSubject } }, `
@@ -139,6 +169,13 @@ $Output | Select-Object `
             }
         }
     }, `
+    UEFICA2023Status, `
+    UEFICA2023ErrorCode, `
+    HighConfidenceOptOut, `
+    MicrosoftUpdateManagedOptIn, `
+    FirmwareManufacturer, `
+    FirmwareReleaseDate, `
+    FirmwareVersion, `
     @{n = 'AvailableUpdates'; e = { $_.AvailableUpdates } }, `
     @{n = 'AvailableUpdatesFlags'; e = { $_.AvailableUpdatesFlags } }, `
     
@@ -155,9 +192,3 @@ $Output | Select-Object `
             ($_.LastEvents | Select-Object -ExpandProperty Message)
         }
     }
-
-
-
-
-
-
