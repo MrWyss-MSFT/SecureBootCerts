@@ -71,14 +71,15 @@ $PCA2011inDBX = ($CertDBX | Where-Object SignatureSubject -like "*Microsoft Wind
 
 
 # Read https://support.microsoft.com/en-us/topic/registry-key-updates-for-secure-boot-windows-devices-with-it-managed-updates-a7be69c9-4634-42e1-9ca1-df06f43f360d#bkmk_registry_keys
+#$SecureBoot = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot" -ErrorAction SilentlyContinue) # Old location
 $SecureBootServicing = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing" -ErrorAction SilentlyContinue)
-$SecureBoot = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot" -ErrorAction SilentlyContinue)
 $SecureBootServicingDeviceAttributes = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing\DeviceAttributes" -ErrorAction SilentlyContinue)
 
 # Available Updates
-$AvailableUpdates = $SecureBoot.AvailableUpdates
+#$AvailableUpdates = $SecureBoot.AvailableUpdates
 
 # Servicing Info
+$AvailableUpdates = $SecureBootServicing.AvailableUpdates
 $UEFICA2023Status = $SecureBootServicing.UEFICA2023Status
 $UEFICA2023ErrorCode = $SecureBootServicing.UEFICA2023ErrorCode
 $HighConfidenceOptOut = $SecureBootServicing.HighConfidenceOptOut
