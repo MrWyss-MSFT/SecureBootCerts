@@ -79,6 +79,7 @@ $SecureBootServicingDeviceAttributes = (Get-ItemProperty -Path "HKLM:\SYSTEM\Cur
 #$AvailableUpdates = $SecureBoot.AvailableUpdates
 
 # Servicing Info
+# Ensure AvailableUpdates is numeric and default to 0 when the registry value is missing/null
 $AvailableUpdates = $SecureBootServicing.AvailableUpdates
 $UEFICA2023Status = $SecureBootServicing.UEFICA2023Status
 $UEFICA2023ErrorCode = $SecureBootServicing.UEFICA2023ErrorCode
@@ -152,7 +153,7 @@ $Output = [PSCustomObject]@{
     UEFICA2023ErrorCode = $UEFICA2023ErrorCode
     HighConfidenceOptOut = $HighConfidenceOptOut
     MicrosoftUpdateManagedOptIn = $MicrosoftUpdateManagedOptIn
-    AvailableUpdates = $AvailableUpdates
+    AvailableUpdates = $AvailableUpdates ?? 0
     AvailableUpdatesFlags = [AvailableUpdatesFlags]$AvailableUpdates
     LastEvents = $LastEvents
     FirmwareManufacturer = $FirmwareManufacturer
