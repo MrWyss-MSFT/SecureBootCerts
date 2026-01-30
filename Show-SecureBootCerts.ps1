@@ -91,6 +91,7 @@ $MicrosoftUpdateManagedOptIn = $SecureBootServicing.MicrosoftUpdateManagedOptIn
 $FirmwareManufacturer = $SecureBootServicingDeviceAttributes.FirmwareManufacturer
 $FirmwareVersion = $SecureBootServicingDeviceAttributes.FirmwareVersion
 $FirmwareReleaseDate = $SecureBootServicingDeviceAttributes.FirmwareReleaseDate
+$CanAttemptUpdateAfter = ($CanAttemptUpdateAfter = $SecureBootServicingDeviceAttributes.CanAttemptUpdateAfter) -is [byte[]] ? [DateTime]::FromFileTime([BitConverter]::ToInt64($CanAttemptUpdateAfter, 0)) : $CanAttemptUpdateAfter
 
 
 <#
@@ -161,6 +162,7 @@ $Output = [PSCustomObject]@{
     FirmwareManufacturer = $FirmwareManufacturer
     FirmwareReleaseDate = $FirmwareReleaseDate
     FirmwareVersion = $FirmwareVersion
+    CanAttemptUpdateAfter = $CanAttemptUpdateAfter
 }
 $Output | Select-Object `
     @{n = 'PK'; e = { $_.PK.SignatureSubject } }, `
@@ -181,6 +183,7 @@ $Output | Select-Object `
     FirmwareManufacturer, `
     FirmwareReleaseDate, `
     FirmwareVersion, `
+    CanAttemptUpdateAfter, `
     @{n = 'AvailableUpdates'; e = { $_.AvailableUpdates } }, `
     @{n = 'AvailableUpdatesFlags'; e = { $_.AvailableUpdatesFlags } }, `
     
