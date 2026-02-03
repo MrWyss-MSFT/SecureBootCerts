@@ -1,3 +1,44 @@
+<#
+.SYNOPSIS
+    Displays Secure Boot certificate and configuration information for Windows devices.
+
+.DESCRIPTION
+    This script retrieves and displays comprehensive Secure Boot information including:
+    - Platform Key (PK), Key Exchange Key (KEK), and Signature Database (DB/DBX) certificates
+    - Secure Boot servicing status and available updates
+    - UEFI CA 2023 update information
+    - Security Version Number (SVN) data from DBX
+    - Firmware details (manufacturer, version, release date)
+    - Recent TPM-WMI event log entries related to Secure Boot updates
+
+.EXAMPLE
+    .\Show-SecureBootCerts.ps1
+    
+    Displays all Secure Boot certificate and configuration information.
+
+.EXAMPLE
+    .\Show-SecureBootCerts.ps1 | Select-Object KEK
+    
+    Displays only the Key Exchange Key (KEK) certificates.
+
+.EXAMPLE
+    .\Show-SecureBootCerts.ps1 | Select-Object PK, KEK, DB
+    
+    Displays the Platform Key, Key Exchange Key, and Signature Database certificates.
+
+.EXAMPLE
+    .\Show-SecureBootCerts.ps1 | Select-Object PCA2011inDBX, AvailableUpdatesFlags
+    
+    Shows whether PCA 2011 is revoked and what Secure Boot updates are available.
+
+.NOTES
+    Requires PowerShell 7.0 or later and administrator privileges.
+    Requires the UEFIv2 module to be installed.
+
+.LINK
+    https://github.com/MrWyss-MSFT/SecureBootCerts
+#>
+
 #Requires -Version 7.0
 #Requires -RunAsAdministrator
 #Requires -Modules UEFIv2
@@ -60,32 +101,30 @@ Function Parse-SvnData {
         #ReservedBytesHex = $reservedHex
     }
 }
-
 #endregion
 
+# Get Secure Boot Certificates
 $CertPK = Get-UEFISecureBootCerts -Variable pk
 $CertKEK = Get-UEFISecureBootCerts -Variable kek
 $CertDB = Get-UEFISecureBootCerts -Variable db
 $CertDBX = Get-UEFISecureBootCerts -Variable dbx
 $PCA2011inDBX = ($CertDBX | Where-Object SignatureSubject -like "*Microsoft Windows Production PCA 2011*").Count -gt 0
 
-
+# Get Secure Boot Information from Registry
 # Read https://support.microsoft.com/en-us/topic/registry-key-updates-for-secure-boot-windows-devices-with-it-managed-updates-a7be69c9-4634-42e1-9ca1-df06f43f360d#bkmk_registry_keys
-#$SecureBoot = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot" -ErrorAction SilentlyContinue) # Old location
+$SecureBoot = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot" -ErrorAction SilentlyContinue) # Old location
 $SecureBootServicing = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing" -ErrorAction SilentlyContinue)
 $SecureBootServicingDeviceAttributes = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing\DeviceAttributes" -ErrorAction SilentlyContinue)
 
-# Available Updates
-#$AvailableUpdates = $SecureBoot.AvailableUpdates
+# SecureBoot Info
+$AvailableUpdates = $SecureBoot.AvailableUpdates ?? 0 # Ensure AvailableUpdates is numeric and default to 0 when the registry value is missing/null
+$HighConfidenceOptOut = $SecureBoot.HighConfidenceOptOut
+$MicrosoftUpdateManagedOptIn = $SecureBoot.MicrosoftUpdateManagedOptIn
 
 # Servicing Info
-# Ensure AvailableUpdates is numeric and default to 0 when the registry value is missing/null
-$AvailableUpdates = $SecureBootServicing.AvailableUpdates ?? 0
 $UEFICA2023Status = $SecureBootServicing.UEFICA2023Status
 $UEFICA2023Error = $SecureBootServicing.UEFICA2023Error
 $UEFICA2023ErrorCode = $SecureBootServicing.UEFICA2023ErrorCode
-$HighConfidenceOptOut = $SecureBootServicing.HighConfidenceOptOut
-$MicrosoftUpdateManagedOptIn = $SecureBootServicing.MicrosoftUpdateManagedOptIn
 
 # Firmware Info
 $FirmwareManufacturer = $SecureBootServicingDeviceAttributes.FirmwareManufacturer
@@ -113,10 +152,6 @@ $CanAttemptUpdateAfter = ($CanAttemptUpdateAfter = $SecureBootServicingDeviceAtt
 1000000000000000 0x8000 → N/A
 #>
 # Enum
-
-
-
-
 
 [Flags()] enum AvailableUpdatesFlags {
     None = 0x0000
@@ -186,7 +221,6 @@ $Output | Select-Object `
     CanAttemptUpdateAfter, `
     @{n = 'AvailableUpdates'; e = { $_.AvailableUpdates } }, `
     @{n = 'AvailableUpdatesFlags'; e = { $_.AvailableUpdatesFlags } }, `
-    
     @{n = 'LastEventId'; e = {
             $e = $_.LastEvents
             if ($e) { $e.Id }
