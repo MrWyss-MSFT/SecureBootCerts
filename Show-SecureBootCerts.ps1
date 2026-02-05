@@ -39,7 +39,7 @@
     https://github.com/MrWyss-MSFT/SecureBootCerts
 #>
 
-#Requires -Version 7.0
+##Requires -Version 7.0
 #Requires -RunAsAdministrator
 #Requires -Modules UEFIv2
 
@@ -117,7 +117,7 @@ $SecureBootServicing = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\C
 $SecureBootServicingDeviceAttributes = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing\DeviceAttributes" -ErrorAction SilentlyContinue)
 
 # SecureBoot Info
-$AvailableUpdates = $SecureBoot.AvailableUpdates ?? 0 # Ensure AvailableUpdates is numeric and default to 0 when the registry value is missing/null
+$AvailableUpdates = if ($null -ne $SecureBoot.AvailableUpdates) { $SecureBoot.AvailableUpdates } else { 0 } # Ensure AvailableUpdates is numeric and default to 0 when the registry value is missing/null
 $HighConfidenceOptOut = $SecureBoot.HighConfidenceOptOut
 $MicrosoftUpdateManagedOptIn = $SecureBoot.MicrosoftUpdateManagedOptIn
 
@@ -130,8 +130,11 @@ $UEFICA2023ErrorCode = $SecureBootServicing.UEFICA2023ErrorCode
 $FirmwareManufacturer = $SecureBootServicingDeviceAttributes.FirmwareManufacturer
 $FirmwareVersion = $SecureBootServicingDeviceAttributes.FirmwareVersion
 $FirmwareReleaseDate = $SecureBootServicingDeviceAttributes.FirmwareReleaseDate
-$CanAttemptUpdateAfter = ($CanAttemptUpdateAfter = $SecureBootServicingDeviceAttributes.CanAttemptUpdateAfter) -is [byte[]] ? [DateTime]::FromFileTime([BitConverter]::ToInt64($CanAttemptUpdateAfter, 0)) : $CanAttemptUpdateAfter
-
+$CanAttemptUpdateAfter = $SecureBootServicingDeviceAttributes.CanAttemptUpdateAfter
+# Convert CanAttemptUpdateAfter from byte[] to DateTime
+if ($CanAttemptUpdateAfter -is [byte[]]) {
+    $CanAttemptUpdateAfter = [DateTime]::FromFileTime([BitConverter]::ToInt64($CanAttemptUpdateAfter, 0))
+}
 
 <#
 0000000000000001 0x0001 → N/A
