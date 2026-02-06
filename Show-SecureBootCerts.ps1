@@ -33,13 +33,12 @@
     Shows whether PCA 2011 is revoked and what Secure Boot updates are available.
 
 .NOTES
-    Requires PowerShell 7.0 or later and administrator privileges.
+    Requires administrator privileges.
 
 .LINK
     https://github.com/MrWyss-MSFT/SecureBootCerts
 #>
 
-#Requires -Version 7.0
 #Requires -RunAsAdministrator
 
 #region Functions
@@ -273,11 +272,22 @@ Function Get-UEFIBootManagerSignature {
 }
 
 Function Parse-SvnData {
-    # Parses the SVN data from a byte array.
+    # Parses the SVN data from a byte array or hex string.
     # https://github.com/microsoft/secureboot_objects/blob/b884b605ec686433531511fbc2c8510e59799aaa/PreSignedObjects/DBX/HashesJsonSchema.json#L283
     param (
-        [byte[]]$Data
+        [Parameter(Mandatory=$true)]
+        $Data
     )
+
+    # Convert hex string to byte array if needed (PowerShell 5 compatible)
+    if ($Data -is [string]) {
+        $hexString = $Data
+        $Data = [byte[]]@(
+            for ($i = 0; $i -lt $hexString.Length; $i += 2) {
+                [Convert]::ToByte($hexString.Substring($i, 2), 16)
+            }
+        )
+    }
 
     if ($null -eq $Data -or $Data.Length -lt 32) {
         Write-Error "Data must be at least 32 bytes long."
@@ -411,7 +421,7 @@ $SVNs = $CertDBX |
     Where-Object SignatureOwner -eq "9d132b6c-59d5-4388-ab1c-185cfcb2eb92" |
     Select-Object -ExpandProperty Signature |
     ForEach-Object {
-        Parse-SvnData -Data ([System.Convert]::FromHexString($_))
+        Parse-SvnData -Data $_
     }
 
 $Output = [PSCustomObject]@{
