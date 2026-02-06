@@ -41,11 +41,104 @@
 
 ##Requires -Version 7.0
 #Requires -RunAsAdministrator
-#Requires -Modules UEFIv2
-
-Import-Module -Name UEFIv2
 
 #region Functions
+function Get-UEFISecureBootCerts {
+<#
+.SYNOPSIS
+    Gets details about the UEFI Secure Boot-related variables.
+ 
+.DESCRIPTION
+    Gets details about the UEFI Secure Boot-related variables (db, dbx, kek, pk).
+ 
+.PARAMETER Variable
+    The UEFI variable to retrieve (defaults to db)
+ 
+.EXAMPLE
+    Get-UEFISecureBootCerts
+ 
+.EXAMPLE
+    Get-UEFISecureBootCerts -db
+ 
+.EXAMPLE
+    Get-UEFISecureBootCerts -dbx
+ 
+.LINK
+    https://oofhours.com/2021/01/19/uefi-secure-boot-who-controls-what-can-run/
+ 
+#Requires -Version 2.0
+#>        
+    [cmdletbinding()]
+    Param (
+        [Parameter()]
+        [String]$Variable = "db"
+    )
+    BEGIN {
+        $EFI_CERT_X509_GUID = [guid]"a5c059a1-94e4-4aa7-87b5-ab155c2bf072"
+        $EFI_CERT_SHA256_GUID = [guid]"c1c41626-504c-4092-aca9-41f936934328"
+    }
+    PROCESS {
+        $db = (Get-SecureBootUEFI -Name $variable).Bytes
+
+        $o = 0
+
+        while ($o -lt $db.Length)
+        {
+            $guidBytes = $db[$o..($o + 15)]
+            [Guid] $guid = [Byte[]]$guidBytes
+            $signatureListSize = [BitConverter]::ToUInt32($db, $o + 16)
+            $signatureHeaderSize = [BitConverter]::ToUInt32($db, $o + 20)
+            $signatureSize = [BitConverter]::ToUInt32($db, $o + 24)
+            $signatureCount = ($signatureListSize - 28) / $signatureSize 
+            # Write-Host "GUID: $guid"
+            # Write-Host "SignatureListSize: $signatureListSize"
+            # Write-Host "SignatureHeaderSize: $signatureHeaderSize"
+            # Write-Host "SignatureSize: $signatureSize"
+            # Write-Host "SignatureCount: $signatureCount"
+
+            $so = $o + 28
+            1..$signatureCount | % {
+
+                $ownerBytes = $db[$so..($so+15)]
+                [Guid] $signatureOwner = [Byte[]]$ownerBytes
+                # Write-Host "SignatureOwner: $signatureOwner"
+
+                if ($guid -eq $EFI_CERT_X509_GUID) {
+                    $certBytes = $db[($so+16)..($so+16+$signatureSize-1)]
+                    if ($PSEdition -eq "Core") {
+                        $cert = [System.Security.Cryptography.X509Certificates.X509Certificate]::new([Byte[]]$certBytes)
+                    } else {
+                        $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
+                        $cert.Import([Byte[]]$certBytes)
+                    }
+                    [PSCustomObject] @{
+                        SignatureOwner = $signatureOwner
+                        SignatureSubject = $cert.Subject
+                        Signature = $cert
+                        SignatureType = $guid
+                    }
+                }
+                elseif ($guid -eq $EFI_CERT_SHA256_GUID) {
+                    $sha256hash = ([Byte[]] $db[($so+16)..($so+48-1)] | % {$_.ToString('X2')} ) -join ''
+                    [PSCustomObject] @{
+                        SignatureOwner = $signatureOwner
+                        Signature = $sha256Hash
+                        SignatureType = $guid
+                    }
+                }
+                else {
+                    Write-Warning "Unable to decode EFI signature type: $guid"
+                }
+
+                $so = $so + $signatureSize
+            }
+
+            $o = $o + $signatureListSize
+        }
+
+    }
+}
+
 Function Get-UEFIBootManagerSignature {
     <#
     .SYNOPSIS
