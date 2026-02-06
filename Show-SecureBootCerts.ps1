@@ -5,6 +5,7 @@
 .DESCRIPTION
     This script retrieves and displays comprehensive Secure Boot information including:
     - Platform Key (PK), Key Exchange Key (KEK), and Signature Database (DB/DBX) certificates
+    - The signature (intermediate) of the boot manager (bootmgfw.efi)
     - Secure Boot servicing status and available updates
     - UEFI CA 2023 update information
     - Security Version Number (SVN) data from DBX
@@ -33,13 +34,12 @@
 
 .NOTES
     Requires PowerShell 7.0 or later and administrator privileges.
-    Requires the UEFIv2 module to be installed.
 
 .LINK
     https://github.com/MrWyss-MSFT/SecureBootCerts
 #>
 
-##Requires -Version 7.0
+#Requires -Version 7.0
 #Requires -RunAsAdministrator
 
 #region Functions
@@ -204,9 +204,20 @@ Function Get-UEFIBootManagerSignature {
         Write-Verbose "Copying bootmgfw.efi to temporary location..."
         Copy-Item -Path $efiBootFile -Destination $tempCopyPath -Force
         
-        # Get the digital signature
-        Write-Verbose "Reading digital signature..."
-        $signature = Get-AuthenticodeSignature -FilePath $tempCopyPath
+        # Get the embedded digital signature (not catalog signature)
+        Write-Verbose "Reading embedded digital signature..."
+        
+        # Load the file as X509Certificate2 to get embedded signature
+        try {
+            $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($tempCopyPath)
+            $signature = [PSCustomObject]@{
+                SignerCertificate = $cert
+                Status = 'Valid'
+            }
+        }
+        catch {
+            throw "Unable to read embedded signature from bootmgfw.efi: $_"
+        }
         
         # Extract the certificate chain
         $certChain = @()

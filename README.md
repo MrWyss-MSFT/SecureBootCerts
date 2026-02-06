@@ -4,10 +4,14 @@ This PowerShell script retrieves and displays information about Secure Boot cert
 
 ## Features
 
-- Retrieves Secure Boot certificate information (pk, kek, db, dbx).
-- Reads SVN Version information.
-- Displays Secure Boot status and related attributes.
-- Provides firmware details including manufacturer, release date, and version.
+- Retrieves Secure Boot certificate information (PK, KEK, DB, DBX).
+- Displays boot manager (bootmgfw.efi) signature and certificate chain from EFI partition.
+- Reads Security Version Number (SVN) information from DBX.
+- Checks if PCA 2011 certificate is revoked (present in DBX).
+- Shows Secure Boot servicing status and available updates with detailed flags.
+- Displays UEFI CA 2023 update status, errors, and error codes.
+- Retrieves recent TPM-WMI event log entries related to Secure Boot updates.
+- Provides firmware details including manufacturer, release date, version, and next update availability.
 
 ## Usage
 
@@ -19,7 +23,6 @@ To run the script, in an elevated PowerShell session, execute the following comm
 
 ## Requirements
 
-- UEFIv2 Module
 - PowerShell 7 or later
 
 ## Demo
