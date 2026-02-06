@@ -46,6 +46,128 @@
 Import-Module -Name UEFIv2
 
 #region Functions
+Function Get-UEFIBootManagerSignature {
+    <#
+    .SYNOPSIS
+        Retrieves the digital signature certificate chain from the bootmgfw.efi file on the EFI partition.
+    
+    .DESCRIPTION
+        This function mounts the EFI partition, copies the bootmgfw.efi file, and retrieves
+        the complete certificate chain used to sign the boot manager.
+    
+    .PARAMETER EFIDriveLetter
+        The drive letter to use for mounting the EFI partition. Default is 'S'.
+    
+    .EXAMPLE
+        Get-UEFIBootManagerSignature
+        
+        Retrieves the certificate chain for bootmgfw.efi.
+    
+    .EXAMPLE
+        Get-UEFIBootManagerSignature -EFIDriveLetter 'Z'
+        
+        Mounts the EFI partition to Z: drive and retrieves the certificate chain.
+    
+    .EXAMPLE
+        $sig = Get-UEFIBootManagerSignature
+        $sig.CertificateChain | Format-Table Subject, NotBefore, NotAfter
+        
+        Displays all certificates in the chain.
+    
+    .OUTPUTS
+        PSCustomObject with the following properties:
+        - SignerCertificate: The signer certificate subject name
+        - CertificateChain: Array of all certificates in the chain with full details
+        - FilePath: The path to the bootmgfw.efi file on the EFI partition
+    #>
+    
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [ValidatePattern('^[A-Z]$')]
+        [string]$EFIDriveLetter = 'S'
+    )
+    
+    $efiMountPath = "${EFIDriveLetter}:"
+    $efiBootFile = "$efiMountPath\EFI\Microsoft\Boot\bootmgfw.efi"
+    $tempCopyPath = "$env:TEMP\bootmgfw_signature_check.efi"
+    $mountedByScript = $false
+    
+    try {
+        # Check if EFI partition is already mounted
+        if (-not (Test-Path $efiMountPath)) {
+            Write-Verbose "Mounting EFI partition to $efiMountPath..."
+            mountvol $efiMountPath /s
+            $mountedByScript = $true
+            Start-Sleep -Milliseconds 500  # Give the system time to mount
+        }
+        
+        # Verify the bootmgfw.efi file exists
+        if (-not (Test-Path $efiBootFile)) {
+            throw "Boot manager file not found at $efiBootFile"
+        }
+        
+        # Copy the file to a temp location for signature verification
+        Write-Verbose "Copying bootmgfw.efi to temporary location..."
+        Copy-Item -Path $efiBootFile -Destination $tempCopyPath -Force
+        
+        # Get the digital signature
+        Write-Verbose "Reading digital signature..."
+        $signature = Get-AuthenticodeSignature -FilePath $tempCopyPath
+        
+        # Extract the certificate chain
+        $certChain = @()
+        
+        if ($signature.SignerCertificate) {
+            # Get the full certificate chain
+            $chain = New-Object System.Security.Cryptography.X509Certificates.X509Chain
+            $chain.ChainPolicy.RevocationMode = [System.Security.Cryptography.X509Certificates.X509RevocationMode]::NoCheck
+            $chain.Build($signature.SignerCertificate) | Out-Null
+            
+            $order = 0
+            foreach ($element in $chain.ChainElements) {
+                $cert = $element.Certificate
+                $certInfo = [PSCustomObject]@{
+                    Order = $order
+                    Subject = $cert.Subject
+                    Issuer = $cert.Issuer
+                    Thumbprint = $cert.Thumbprint
+                    NotBefore = $cert.NotBefore
+                    NotAfter = $cert.NotAfter
+                }
+                $certChain += $certInfo
+                $order++
+            }
+        }
+        
+        return [PSCustomObject]@{
+            SignerCertificate = $signature.SignerCertificate.Subject
+            CertificateChain = $certChain
+            FilePath = $efiBootFile
+        }
+    }
+    catch {
+        Write-Error "Error reading boot manager signature: $_"
+        return [PSCustomObject]@{
+            SignerCertificate = $null
+            CertificateChain = @()
+            FilePath = $efiBootFile
+        }
+    }
+    finally {
+        # Clean up temp file
+        if (Test-Path $tempCopyPath) {
+            Remove-Item -Path $tempCopyPath -Force -ErrorAction SilentlyContinue
+        }
+        
+        # Unmount EFI partition if we mounted it
+        if ($mountedByScript) {
+            Write-Verbose "Unmounting EFI partition from $efiMountPath..."
+            mountvol $efiMountPath /d
+        }
+    }
+}
+
 Function Parse-SvnData {
     # Parses the SVN data from a byte array.
     # https://github.com/microsoft/secureboot_objects/blob/b884b605ec686433531511fbc2c8510e59799aaa/PreSignedObjects/DBX/HashesJsonSchema.json#L283
@@ -108,6 +230,11 @@ $CertPK = Get-UEFISecureBootCerts -Variable pk
 $CertKEK = Get-UEFISecureBootCerts -Variable kek
 $CertDB = Get-UEFISecureBootCerts -Variable db
 $CertDBX = Get-UEFISecureBootCerts -Variable dbx
+
+# Get the boot manager signature subject of the intermediate certificate
+$BootManagerSignature = ((Get-UEFIBootManagerSignature).CertificateChain | where Order -eq 1).Subject
+
+# Check if PCA 2011 is in DBX
 $PCA2011inDBX = ($CertDBX | Where-Object SignatureSubject -like "*Microsoft Windows Production PCA 2011*").Count -gt 0
 
 # Get Secure Boot Information from Registry
@@ -187,6 +314,7 @@ $Output = [PSCustomObject]@{
     PK = $CertPK
     KEK = $CertKEK
     DB = $CertDB
+    BootManagerSignature = $BootManagerSignature
     PCA2011inDBX = $PCA2011inDBX
     SVNs = $SVNs
     UEFICA2023Status = $UEFICA2023Status
@@ -206,6 +334,7 @@ $Output | Select-Object `
     @{n = 'PK'; e = { $_.PK.SignatureSubject } }, `
     @{n = 'KEK'; e = { $_.KEK.SignatureSubject } }, `
     @{n = 'DB'; e = { $_.DB.SignatureSubject } }, `
+    BootManagerSignature, `
     PCA2011inDBX, `
     @{n = 'SVNs'; e = {
             if ($_.SVNs) {
