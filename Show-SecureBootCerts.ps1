@@ -445,61 +445,28 @@ $SVNs = $CertDBX |
         Parse-SvnData -Data $_
     }
 
-$Output = [PSCustomObject]@{
-    PK = $CertPK
-    KEK = $CertKEK
-    DB = $CertDB
+[PSCustomObject]@{
+    PK = $CertPK.SignatureSubject
+    KEK = $CertKEK.SignatureSubject
+    DB = $CertDB.SignatureSubject
     BootManagerSignature = $BootManagerSignature
     PCA2011inDBX = $PCA2011inDBX
-    SVNs = $SVNs
+    SVNs = if ($SVNs) {
+        ($SVNs | ForEach-Object { "v$($_.Version) [$($_.ApplicationGUID)]" }) -join ', '
+    } else { $null }
     UEFICA2023Status = $UEFICA2023Status
     UEFICA2023Error = $UEFICA2023Error
     UEFICA2023ErrorCode = $UEFICA2023ErrorCode
     WindowsUEFICA2023Capable = Get-WindowsUEFICA2023CapableInfo -KeyValue $WindowsUEFICA2023Capable
     HighConfidenceOptOut = $HighConfidenceOptOut
     MicrosoftUpdateManagedOptIn = $MicrosoftUpdateManagedOptIn
-    AvailableUpdates = $AvailableUpdates
-    AvailableUpdatesFlags = [AvailableUpdatesFlags]$AvailableUpdates
-    LastEvents = $LastEvents
     FirmwareManufacturer = $FirmwareManufacturer
     FirmwareReleaseDate = $FirmwareReleaseDate
     FirmwareVersion = $FirmwareVersion
     CanAttemptUpdateAfter = $CanAttemptUpdateAfter
+    AvailableUpdates = $AvailableUpdates
+    AvailableUpdatesFlags = [AvailableUpdatesFlags]$AvailableUpdates
+    LastEventId = if ($LastEvents) { $LastEvents.Id } else { $null }
+    LastEventTime = if ($LastEvents) { $LastEvents.TimeCreated } else { $null }
+    LastEventMessage = if ($LastEvents) { $LastEvents.Message } else { $null }
 }
-$Output | Select-Object `
-    @{n = 'PK'; e = { $_.PK.SignatureSubject } }, `
-    @{n = 'KEK'; e = { $_.KEK.SignatureSubject } }, `
-    @{n = 'DB'; e = { $_.DB.SignatureSubject } }, `
-    BootManagerSignature, `
-    PCA2011inDBX, `
-    @{n = 'SVNs'; e = {
-            if ($_.SVNs) {
-                ($_.SVNs | ForEach-Object { "v$($_.Version) [$($_.ApplicationGUID)]" }) -join ', '
-            }
-        }
-    }, `
-    UEFICA2023Status, `
-    UEFICA2023Error, `
-    UEFICA2023ErrorCode, `
-    WindowsUEFICA2023Capable, `
-    HighConfidenceOptOut, `
-    MicrosoftUpdateManagedOptIn, `
-    FirmwareManufacturer, `
-    FirmwareReleaseDate, `
-    FirmwareVersion, `
-    CanAttemptUpdateAfter, `
-    @{n = 'AvailableUpdates'; e = { $_.AvailableUpdates } }, `
-    @{n = 'AvailableUpdatesFlags'; e = { $_.AvailableUpdatesFlags } }, `
-    @{n = 'LastEventId'; e = {
-            $e = $_.LastEvents
-            if ($e) { $e.Id }
-        }
-    }, `
-    @{n = 'LastEventTime'; e = {
-            ($_.LastEvents | Select-Object -ExpandProperty TimeCreated)
-        }
-    }, `
-    @{n = 'LastEventMessage'; e = {
-            ($_.LastEvents | Select-Object -ExpandProperty Message)
-        }
-    }
