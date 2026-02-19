@@ -366,6 +366,9 @@ $MicrosoftUpdateManagedOptIn = $SecureBoot.MicrosoftUpdateManagedOptIn
 $UEFICA2023Status = $SecureBootServicing.UEFICA2023Status
 $UEFICA2023Error = $SecureBootServicing.UEFICA2023Error
 $UEFICA2023ErrorCode = $SecureBootServicing.UEFICA2023ErrorCode
+$WindowsUEFICA2023Capable = $SecureBootServicing.WindowsUEFICA2023Capable
+
+
 
 # Firmware Info
 $FirmwareManufacturer = $SecureBootServicingDeviceAttributes.FirmwareManufacturer
@@ -409,6 +412,24 @@ if ($CanAttemptUpdateAfter -is [byte[]]) {
     Apply_Microsoft_UEFI_and_Option_ROM_CA_2023 = 0x4000
 }
 
+# WindowsUEFICA2023Capable key https://support.microsoft.com/en-au/topic/registry-key-updates-for-secure-boot-windows-devices-with-it-managed-updates-a7be69c9-4634-42e1-9ca1-df06f43f360d#:~:text=WindowsUEFICA2023Capable
+# Function to convert WindowsUEFICA2023Capable value to descriptive object
+function Get-WindowsUEFICA2023CapableInfo {
+    param([int]$KeyValue)
+    
+    $text = switch ($KeyValue) {
+        0 { "UEFI CA 2023 Not in DB" }
+        1 { "UEFI CA 2023 in DB" }
+        2 { "UEFI CA 2023 in DB and Booting with 2023 Boot Manager" }
+        default { "Unknown ($KeyValue)" }
+    }
+    
+    [PSCustomObject]@{
+        Value = $KeyValue
+        Text = $text
+    }
+}
+
 # Get TPM-WMI event log entries for Secure Boot updates
 $LastEvents = Get-WinEvent -FilterHashtable @{
     LogName      = 'System'
@@ -434,6 +455,7 @@ $Output = [PSCustomObject]@{
     UEFICA2023Status = $UEFICA2023Status
     UEFICA2023Error = $UEFICA2023Error
     UEFICA2023ErrorCode = $UEFICA2023ErrorCode
+    WindowsUEFICA2023Capable = Get-WindowsUEFICA2023CapableInfo -KeyValue $WindowsUEFICA2023Capable
     HighConfidenceOptOut = $HighConfidenceOptOut
     MicrosoftUpdateManagedOptIn = $MicrosoftUpdateManagedOptIn
     AvailableUpdates = $AvailableUpdates
@@ -459,6 +481,7 @@ $Output | Select-Object `
     UEFICA2023Status, `
     UEFICA2023Error, `
     UEFICA2023ErrorCode, `
+    WindowsUEFICA2023Capable, `
     HighConfidenceOptOut, `
     MicrosoftUpdateManagedOptIn, `
     FirmwareManufacturer, `
